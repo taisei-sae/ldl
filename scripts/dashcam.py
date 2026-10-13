@@ -1,3 +1,5 @@
+import time
+
 import cv2
 import torch
 import numpy
@@ -19,17 +21,29 @@ def main():
         print(f"w: {w}")
         print(f"h: {h}")
 
-        # Try getting the first frame
-        is_successful, original_frame = cap.read()
-        if is_successful:
-            # prepare the model
-            weights = FasterRCNN_ResNet50_FPN_V2_Weights.DEFAULT
-            model = fasterrcnn_resnet50_fpn_v2(weights=weights)
-            model.eval()
-            model.to("cuda")
-            preprocess = weights.transforms()
+        writer = cv2.VideoWriter("data/faster-rcnn.mp4",
+                                 cv2.VideoWriter.fourcc(*"mp4v"),
+                                 fps,
+                                 (w, h))
+        if not writer.isOpened():
+            raise IOError
+
+        # prepare the model
+        weights = FasterRCNN_ResNet50_FPN_V2_Weights.DEFAULT
+        model = fasterrcnn_resnet50_fpn_v2(weights=weights)
+        model.eval()
+        model.to("cuda")
+        preprocess = weights.transforms()
+
+        elapseds = []
+
+        for i in range(frame_count):
+            is_successful, original_frame = cap.read()
+            if not is_successful:
+                continue
 
             # prepare the frame image
+            start = time.perf_counter()
             frame = cv2.cvtColor(original_frame, cv2.COLOR_BGR2RGB)
             frame = torch.from_numpy(frame)
             frame = frame.permute([2, 0, 1])
@@ -39,6 +53,11 @@ def main():
             # predict
             with torch.inference_mode():
                 result = model([frame])
+            
+            torch.cuda.synchronize()
+            end = time.perf_counter()
+            if i > 10:
+                elapseds.append(end - start)
 
             # check the results
             boxes = result[0]["boxes"].cpu().numpy().astype(numpy.int32)
@@ -50,17 +69,18 @@ def main():
                 if score > 0.5:
                     cv2.rectangle(res_frame, [box[0], box[1]], [box[2], box[3]], (0, 255, 0))
                     cv2.putText(res_frame,
-                                f"{weights.meta["categories"][label]}, {score:.3f}",
+                                f"{weights.meta['categories'][label]}, {score:.3f}",
                                 [box[0], box[1]],
                                 cv2.FONT_HERSHEY_PLAIN,
                                 1.0,
-                                (0, 255, 0)
-                                )
+                                (0, 255, 0))
 
-            cv2.imwrite("data/frame1.png", res_frame)
-            
-            cap.release()
-
+            writer.write(res_frame)
+        writer.release()
+        cap.release()
+    print("Finished.")
+    elapseds = numpy.array(elapseds)
+    print(f"mean: {elapseds.mean()}, max: {elapseds.max()}")
     
 
 if __name__ == "__main__":
