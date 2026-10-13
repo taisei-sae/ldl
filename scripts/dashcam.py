@@ -33,7 +33,7 @@ def main():
             frame = cv2.cvtColor(original_frame, cv2.COLOR_BGR2RGB)
             frame = torch.from_numpy(frame)
             frame = frame.permute([2, 0, 1])
-            frame = preprocess(frame)
+            # frame = preprocess(frame)
             frame = frame.to("cuda")
 
             # predict
