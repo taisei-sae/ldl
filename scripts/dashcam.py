@@ -34,6 +34,7 @@ def main():
             frame = torch.from_numpy(frame)
             frame = frame.permute([2, 0, 1])
             # frame = preprocess(frame)
+            frame = frame.float()
             frame = frame.to("cuda")
 
             # predict
@@ -57,7 +58,7 @@ def main():
                                 (0, 255, 0)
                                 )
 
-            cv2.imwrite("data/frame1.png", res_frame)
+            cv2.imwrite("data/frame1_float.png", res_frame)
             
             cap.release()
 
